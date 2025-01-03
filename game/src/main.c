@@ -74,11 +74,12 @@ void InitGame(Game* game)
     LoadSprite(game, "/spritesheet_obstacles.png", OBSTACLE);
     LoadSprite(game, "/ground.png", GROUND);
 
+    // Create entities
     SetupEntities(game);
 
     game->entities[PLAYER] = (Entity){
         .type = PLAYER,
-        .position = (Vector2){.x = 100, .y = 100 },
+        .position = (Vector2){.x = 0, .y = 100 },
         .scale = (Vector2){.x = 2, .y = 2 },
         .sprite = 1,
         .spriteCellSize = (Vector2){.x = 58, .y = 43},
@@ -88,6 +89,20 @@ void InitGame(Game* game)
         .animationSpeed = 5,
         .animationFrames = 8
     };
+
+    for (int i = 0; i < 5; i++)
+    {
+        Entity entity = {
+            .type = GROUND,
+            .position = (Vector2){.x = 121 * 5 * i, .y = 186 },
+            .scale = (Vector2){.x = 5, .y = 5 },
+            .sprite = 0,
+            .spriteCellSize = (Vector2){.x = 121, .y = 11},
+            .spriteSheet = &game->spriteSheets[GROUND],
+        };
+
+        game->entities[PLAYER + i + 1] = entity;
+    }
 }
 
 void UpdateGame(Game* game, double deltaTime)
@@ -97,6 +112,7 @@ void UpdateGame(Game* game, double deltaTime)
     {
         Entity* entity = &game->entities[i];
 
+        // Animate entities
         if (entity->bAnimate && 
             entity->type != MAX_ENTITY_TYPES)
         {
@@ -106,6 +122,7 @@ void UpdateGame(Game* game, double deltaTime)
             entity->sprite = (int)(s_FramesCount * deltaTime * entity->animationSpeed) % entity->animationFrames;
         }
 
+        // Entities' logic
         switch (entity->type)
         {
         case PLAYER:
@@ -113,6 +130,13 @@ void UpdateGame(Game* game, double deltaTime)
             continue;
         case OBSTACLE:
             // Do obstacle's stuff
+            continue;
+        case GROUND:
+            entity->position.x = entity->position.x - 100 * deltaTime;
+
+            if (entity->position.x < -(entity->spriteCellSize.x * entity->scale.x + 1))
+                entity->position.x = 2420;
+
             continue;
         default:
             continue;
@@ -162,11 +186,10 @@ void Update(Game* game)
     clock_t lastFrameTime = clock();
     while (!WindowShouldClose())
     {
+        // Calculate delta time
         clock_t currentFrameTime = clock();
         double deltaTime = (double)(currentFrameTime - lastFrameTime) / CLOCKS_PER_SEC;
         lastFrameTime = currentFrameTime;
-
-        printf("%f\n", deltaTime);
 
         UpdateGame(game, deltaTime);
         DrawGame(game);
