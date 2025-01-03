@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 
 #define STRING_BUFFER 256
 
@@ -28,6 +29,8 @@ typedef struct _Entity
     int sprite;
 
     int bAnimate;
+    int animationSpeed;
+    int animationFrames;
 } Entity;
 
 #define MAX_ENTITY_COUNT 25
@@ -35,6 +38,8 @@ typedef struct _Game
 {
     Entity entities[MAX_ENTITY_COUNT];
     Texture2D spriteSheets[MAX_ENTITY_TYPES];
+
+    int targetFPS;
 } Game;
 
 void LoadSprite(Game* game, const char* spriteSheet, EntityType forEntity)
@@ -62,6 +67,8 @@ void InitGame(Game* game)
     InitWindow(1920, 1080, "Google Dino Clone");
     SetTargetFPS(60);
 
+    game->targetFPS = 60;
+
     // Load Sprites
     LoadSprite(game, "/spritesheet_dino.png", PLAYER);
     LoadSprite(game, "/spritesheet_obstacles.png", OBSTACLE);
@@ -75,15 +82,31 @@ void InitGame(Game* game)
         .scale = (Vector2){.x = 2, .y = 2 },
         .sprite = 1,
         .spriteCellSize = (Vector2){.x = 58, .y = 43},
-        .spriteSheet = &game->spriteSheets[PLAYER]
+        .spriteSheet = &game->spriteSheets[PLAYER],
+
+        .bAnimate = 1,
+        .animationSpeed = 5,
+        .animationFrames = 8
     };
 }
 
-void UpdateGame(Game* game)
+void UpdateGame(Game* game, double deltaTime)
 {
+    static int s_FramesCount = 0;
     for (int i = 0; i < MAX_ENTITY_COUNT; i++)
     {
-        switch (game->entities[i].type)
+        Entity* entity = &game->entities[i];
+
+        if (entity->bAnimate && 
+            entity->type != MAX_ENTITY_TYPES)
+        {
+            s_FramesCount++;
+            s_FramesCount = s_FramesCount % game->targetFPS;
+
+            entity->sprite = (int)(s_FramesCount * deltaTime * entity->animationSpeed) % entity->animationFrames;
+        }
+
+        switch (entity->type)
         {
         case PLAYER:
             // Do player's stuff
@@ -136,9 +159,16 @@ void DrawGame(Game* game)
 
 void Update(Game* game)
 {
+    clock_t lastFrameTime = clock();
     while (!WindowShouldClose())
     {
-        UpdateGame(game);
+        clock_t currentFrameTime = clock();
+        double deltaTime = (double)(currentFrameTime - lastFrameTime) / CLOCKS_PER_SEC;
+        lastFrameTime = currentFrameTime;
+
+        printf("%f\n", deltaTime);
+
+        UpdateGame(game, deltaTime);
         DrawGame(game);
     }
 }
