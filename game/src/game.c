@@ -1,5 +1,6 @@
 #include "game.h"
 
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 
@@ -15,7 +16,7 @@ static void AnimateEntity(Entity* entity, double deltaTime, int targetFPS)
         s_FramesCount++;
         s_FramesCount = s_FramesCount % targetFPS;
 
-        entity->sprite = (int)(s_FramesCount * deltaTime * entity->animationSpeed) % entity->animationFrames;
+        entity->sprite = (int)(s_FramesCount * entity->animationSpeed * deltaTime) % entity->animationFrames;
     }
 
 }
@@ -28,10 +29,24 @@ static void UpdateGround(Game* game, Entity* entity, double deltaTime)
     if (entity->position.x < -(entity->spriteCellSize.x * entity->scale.x))
         entity->position.x = 2420;
 }
+static void UpdatePlayer(Game* game, Entity* entity, double deltaTime) 
+{
+   
+    for (int i = PLAYER + 1; i < MAX_ENTITY_COUNT; i++)
+    {
+        if (game->entities[i].type == OBSTACLE &&
+            CheckCollision(entity->collider, game->entities[i].collider))
+        {
+            game->state = OVER;
+        }
+    }
+
+    if (IsKeyPressed(KEY_SPACE) && entity->state == IDLE)
+        entity->state = JUMPING;
+}
 
 static void UpdateGameLogic(Game* game, double deltaTime)
 {
-
     for (int i = 0; i < MAX_ENTITY_COUNT; i++)
     {
         Entity* entity = &game->entities[i];
@@ -41,7 +56,7 @@ static void UpdateGameLogic(Game* game, double deltaTime)
         switch (entity->type)
         {
         case PLAYER:
-            // Do player's stuff
+            UpdatePlayer(game, entity, deltaTime);
             continue;
         case OBSTACLE:
             // Do obstacle's stuff
@@ -73,14 +88,16 @@ void InitGame(Game* game)
 
     game->entities[PLAYER] = (Entity){
         .type = PLAYER,
-        .position = (Vector2){.x = 0, .y = 100 },
+        .state = FALLING,
+
+        .position = (Vector2){.x = 0, .y = 50 },
         .scale = (Vector2){.x = 2, .y = 2 },
         .sprite = 0,
         .spriteCellSize = (Vector2){.x = 58, .y = 43},
         .spriteSheet = &game->spriteSheets[PLAYER],
 
         .bAnimate = 1,
-        .animationSpeed = 5,
+        .animationSpeed = 10.0f,
         .animationFrames = 6
     };
 
@@ -110,6 +127,42 @@ void UpdateColliders(Game* game)
             .width = entity->spriteCellSize.x * entity->scale.x,
             .height = entity->spriteCellSize.y * entity->scale.y
         };
+    }
+}
+
+void SimulatePlayerPhysics(Game* game, double deltaTime)
+{
+    Entity* player = &game->entities[PLAYER];
+
+    static const fallingSpeed = 150.0f;
+    static const maxJumpingSpeed = 30.0f;
+    static float speed = 30.0f;
+
+    for (int i = PLAYER + 1; i < MAX_ENTITY_COUNT; i++)
+    {
+        Entity* entity = &game->entities[i];
+
+        if (entity->type == GROUND &&
+            player->state == FALLING &&
+            CheckCollision(player->collider, entity->collider))
+        {
+            player->state = IDLE;
+            speed = maxJumpingSpeed;
+        }
+    }
+
+    if (player->state == JUMPING)
+    {
+        player->position.y -= speed * deltaTime;
+        speed -= 10.0f * deltaTime;
+
+        if (speed < 0.0f)
+            player->state = FALLING;
+    }
+
+    if (player->state == FALLING)
+    {
+        player->position.y += fallingSpeed * deltaTime;
     }
 }
 
@@ -164,6 +217,7 @@ void UpdateGame(Game* game)
 
         UpdateColliders(game);
         UpdateGameLogic(game, deltaTime);
+        SimulatePlayerPhysics(game, deltaTime);
         DrawGame(game);
     }
 }
@@ -195,4 +249,41 @@ void SetupEntities(Game* game)
 
     for (int i = 0; i < MAX_ENTITY_COUNT; i++)
         game->entities[i] = entity;
+}
+
+static int IsALeftToB(const Rectangle boundingBox1, const Rectangle boundingBox2)
+{
+    float Ax = boundingBox1.x + boundingBox1.width;
+    float Bx = boundingBox2.x;
+
+    return Ax < Bx;
+}
+static int IsARightToB(const Rectangle boundingBox1, const Rectangle boundingBox2)
+{
+    float Ax = boundingBox1.x;
+    float Bx = boundingBox2.x + boundingBox2.width;
+
+    return Ax > Bx;
+}
+static int IsAAboveB(const Rectangle boundingBox1, const Rectangle boundingBox2)
+{
+    float Ay = boundingBox1.y + boundingBox1.height;
+    float By = boundingBox2.y;
+
+    return Ay < By;
+}
+static int IsABelowB(const Rectangle boundingBox1, const Rectangle boundingBox2)
+{
+    float Ay = boundingBox1.y;
+    float By = boundingBox2.y + boundingBox2.height;
+
+    return Ay > By;
+}
+
+int CheckCollision(const Rectangle boundingBox1, const Rectangle boundingBox2)
+{
+    return !IsALeftToB(boundingBox1, boundingBox2) &&
+        !IsARightToB(boundingBox1, boundingBox2) &&
+        !IsAAboveB(boundingBox1, boundingBox2) &&
+        !IsABelowB(boundingBox1, boundingBox2);
 }
