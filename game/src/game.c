@@ -134,9 +134,10 @@ void SimulatePlayerPhysics(Game* game, double deltaTime)
 {
     Entity* player = &game->entities[PLAYER];
 
-    static const fallingSpeed = 150.0f;
-    static const maxJumpingSpeed = 30.0f;
-    static float speed = 30.0f;
+    static const float fallingSpeed = 150.0f;
+    static const float maxJumpingSpeed = 150.0f;
+    static const float timeInAir = 0.75f;
+    static float jumpingTime = 0;
 
     for (int i = PLAYER + 1; i < MAX_ENTITY_COUNT; i++)
     {
@@ -147,16 +148,16 @@ void SimulatePlayerPhysics(Game* game, double deltaTime)
             CheckCollision(player->collider, entity->collider))
         {
             player->state = IDLE;
-            speed = maxJumpingSpeed;
+            jumpingTime = 0;
         }
     }
 
     if (player->state == JUMPING)
     {
-        player->position.y -= speed * deltaTime;
-        speed -= 10.0f * deltaTime;
+        player->position.y -= maxJumpingSpeed * deltaTime;
+        jumpingTime += deltaTime;
 
-        if (speed < 0.0f)
+        if (jumpingTime > timeInAir)
             player->state = FALLING;
     }
 
