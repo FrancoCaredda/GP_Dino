@@ -23,15 +23,16 @@ static void AnimateEntity(Entity* entity, double deltaTime, int targetFPS)
 
 static void UpdateGround(Game* game, Entity* entity, double deltaTime)
 {
+    static const float groundSpeed = 50;
+
     Entity* player = &game->entities[PLAYER];
-    entity->position.x = entity->position.x - player->animationSpeed * deltaTime;
+    entity->position.x = entity->position.x - player->animationSpeed * groundSpeed * deltaTime;
 
     if (entity->position.x < -(entity->spriteCellSize.x * entity->scale.x))
         entity->position.x = 2420;
 }
 static void UpdatePlayer(Game* game, Entity* entity, double deltaTime) 
 {
-   
     for (int i = PLAYER + 1; i < MAX_ENTITY_COUNT; i++)
     {
         if (game->entities[i].type == OBSTACLE &&
@@ -42,7 +43,17 @@ static void UpdatePlayer(Game* game, Entity* entity, double deltaTime)
     }
 
     if (IsKeyPressed(KEY_SPACE) && entity->state == IDLE)
+    {
         entity->state = JUMPING;
+        entity->bAnimate = 0;
+        entity->sprite = 7;
+    }
+
+    if (entity->state == IDLE && !entity->bAnimate)
+    {
+        entity->bAnimate = 1;
+        entity->sprite = 0;
+    }
 }
 
 static void UpdateGameLogic(Game* game, double deltaTime)
@@ -97,7 +108,7 @@ void InitGame(Game* game)
         .spriteSheet = &game->spriteSheets[PLAYER],
 
         .bAnimate = 1,
-        .animationSpeed = 10.0f,
+        .animationSpeed = 20.0f,
         .animationFrames = 6
     };
 
@@ -199,7 +210,7 @@ void DrawGame(Game* game)
             Vector2 finalTransform = { -entity->position.x, -entity->position.y };
             DrawTexturePro(*entity->spriteSheet, source, destination,
                 finalTransform, 0, RAYWHITE);
-            DrawRectangleLines(entity->collider.x, entity->collider.y, entity->collider.width, entity->collider.height, colliderColor);
+            //DrawRectangleLines(entity->collider.x, entity->collider.y, entity->collider.width, entity->collider.height, colliderColor);
         }
     }
 
