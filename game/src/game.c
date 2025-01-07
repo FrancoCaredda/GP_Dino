@@ -20,7 +20,6 @@ static void AnimateEntity(Entity* entity, double deltaTime, int targetFPS)
     }
 
 }
-
 static void UpdateGround(Game* game, Entity* entity, double deltaTime)
 {
     static const float groundSpeed = 50;
@@ -55,6 +54,28 @@ static void UpdatePlayer(Game* game, Entity* entity, double deltaTime)
         entity->sprite = 0;
     }
 }
+static void UpdateObstacle(Game* game, Entity* entity, double deltaTime)
+{
+    static const float groundSpeed = 50;
+
+    Entity* player = &game->entities[PLAYER];
+    entity->position.x = entity->position.x - player->animationSpeed * groundSpeed * deltaTime;
+
+    // Find the furthest obstacle and add 200 pixels
+
+    Entity* obstacle = &game->entities[0];
+    for (int i = 1; i < MAX_ENTITY_COUNT; i++)
+    {
+        if (game->entities[i].type == OBSTACLE &&
+            (obstacle->position.x < game->entities[i].position.x))
+        {
+            obstacle = &game->entities[i];
+        }
+    }
+
+    if (entity->position.x < -(entity->spriteCellSize.x * entity->scale.x))
+        entity->position.x = obstacle->position.x + 1000;
+}
 
 static void UpdateGameLogic(Game* game, double deltaTime)
 {
@@ -70,7 +91,7 @@ static void UpdateGameLogic(Game* game, double deltaTime)
             UpdatePlayer(game, entity, deltaTime);
             continue;
         case OBSTACLE:
-            // Do obstacle's stuff
+            UpdateObstacle(game, entity, deltaTime);
             continue;
         case GROUND:
             UpdateGround(game, entity, deltaTime);
@@ -82,21 +103,8 @@ static void UpdateGameLogic(Game* game, double deltaTime)
 }
 
 // Game related functions
-void InitGame(Game* game)
+static void InitEntities(Game* game)
 {
-    InitWindow(1920, 1080, "Google Dino Clone");
-    SetTargetFPS(60);
-
-    game->targetFPS = 60;
-
-    // Load Sprites
-    LoadSprite(game, "/spritesheet_dino.png", PLAYER);
-    LoadSprite(game, "/spritesheet_obstacles.png", OBSTACLE);
-    LoadSprite(game, "/ground.png", GROUND);
-
-    // Create entities
-    SetupEntities(game);
-
     game->entities[PLAYER] = (Entity){
         .type = PLAYER,
         .state = FALLING,
@@ -112,22 +120,56 @@ void InitGame(Game* game)
         .animationFrames = 6
     };
 
-    for (int i = 0; i < 5; i++)
+    // Generate ground
+    const int groundStartIndex = PLAYER + 1;
+    const int groundCount = 5;
+
+    for (int i = 0; i < groundCount; i++)
     {
-        Entity entity = {
+        game->entities[groundStartIndex + i] = (Entity){
             .type = GROUND,
-            .position = (Vector2){.x = 121 * 5 * i, .y = 186 },
-            .scale = (Vector2){.x = 5, .y = 5 },
+            .position = (Vector2) {.x = 121 * 5 * i, .y = 186 },
+            .scale = (Vector2) {.x = 5, .y = 5 },
             .sprite = 0,
             .spriteCellSize = (Vector2){.x = 121, .y = 11},
             .spriteSheet = &game->spriteSheets[GROUND],
         };
+    }
+   
 
-        game->entities[PLAYER + i + 1] = entity;
+    // Generate obstacles
+    const int obstacleStartIndex = groundStartIndex + groundCount;
+    const int obstacleCount = MAX_ENTITY_COUNT - groundCount - 1;
+
+    for (int i = 0; i < obstacleCount; i++)
+    {
+        game->entities[obstacleStartIndex + i] = (Entity){
+            .type = OBSTACLE,
+            .position = (Vector2) { .x = 100 * 2 * i, .y = 108 },
+            .scale = (Vector2) { .x = 1.5f, .y = 1.5f },
+            .sprite = 0,
+            .spriteCellSize = (Vector2) { .x = 38, .y = 52 },
+            .spriteSheet = &game->spriteSheets[OBSTACLE]
+        };
     }
 }
+void InitGame(Game* game)
+{
+    InitWindow(1920, 1080, "Google Dino Clone");
+    SetTargetFPS(60);
 
-void UpdateColliders(Game* game)
+    game->targetFPS = 60;
+
+    // Load Sprites
+    LoadSprite(game, "/spritesheet_dino.png", PLAYER);
+    LoadSprite(game, "/spritesheet_obstacles.png", OBSTACLE);
+    LoadSprite(game, "/ground.png", GROUND);
+
+    // Create entities
+    InitEntities(game);
+}
+
+static void UpdateColliders(Game* game)
 {
     for (int i = 0; i < MAX_ENTITY_COUNT; i++)
     {
@@ -140,14 +182,14 @@ void UpdateColliders(Game* game)
         };
     }
 }
-
-void SimulatePlayerPhysics(Game* game, double deltaTime)
+static void SimulatePlayerPhysics(Game* game, double deltaTime)
 {
     Entity* player = &game->entities[PLAYER];
 
-    static const float fallingSpeed = 150.0f;
-    static const float maxJumpingSpeed = 150.0f;
-    static const float timeInAir = 0.75f;
+    static const float maxFallingSpeed = 350.0f;
+    static const float maxJumpingSpeed = 450.0f;
+    static const float timeInAir = 0.40f;
+    static float fallingSpeed = 350;
     static float jumpingTime = 0;
 
     for (int i = PLAYER + 1; i < MAX_ENTITY_COUNT; i++)
@@ -160,6 +202,7 @@ void SimulatePlayerPhysics(Game* game, double deltaTime)
         {
             player->state = IDLE;
             jumpingTime = 0;
+            fallingSpeed = maxFallingSpeed;
         }
     }
 
@@ -175,10 +218,10 @@ void SimulatePlayerPhysics(Game* game, double deltaTime)
     if (player->state == FALLING)
     {
         player->position.y += fallingSpeed * deltaTime;
+        fallingSpeed += 98 * deltaTime;
     }
 }
-
-void DrawGame(Game* game)
+static void DrawGame(Game* game)
 {
     BeginDrawing();
 
@@ -210,7 +253,7 @@ void DrawGame(Game* game)
             Vector2 finalTransform = { -entity->position.x, -entity->position.y };
             DrawTexturePro(*entity->spriteSheet, source, destination,
                 finalTransform, 0, RAYWHITE);
-            //DrawRectangleLines(entity->collider.x, entity->collider.y, entity->collider.width, entity->collider.height, colliderColor);
+            DrawRectangleLines(entity->collider.x, entity->collider.y, entity->collider.width, entity->collider.height, colliderColor);
         }
     }
 
@@ -251,16 +294,6 @@ void LoadSprite(Game* game, const char* spriteSheet, EntityType forEntity)
 
     if (!IsTextureReady(game->spriteSheets[forEntity]))
         printf("%s texture isn't ready", spriteSheet);
-}
-
-void SetupEntities(Game* game)
-{
-    Entity entity = {
-        .type = MAX_ENTITY_TYPES
-    };
-
-    for (int i = 0; i < MAX_ENTITY_COUNT; i++)
-        game->entities[i] = entity;
 }
 
 static int IsALeftToB(const Rectangle boundingBox1, const Rectangle boundingBox2)

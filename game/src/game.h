@@ -1,7 +1,7 @@
 #ifndef _GAME_H
 #define _GAME_H
 
-#define MAX_ENTITY_COUNT 25
+#define MAX_ENTITY_COUNT 9
 #define STRING_BUFFER 256
 
 #include "raylib.h"
@@ -46,7 +46,6 @@ typedef struct _Entity
     float animationSpeed;
 } Entity;
 
-
 typedef enum _GameState
 {
     PLAY = 0,
@@ -66,11 +65,9 @@ typedef struct _Game
 
 void InitGame(Game* game);
 void UpdateGame(Game* game);
-void DrawGame(Game* game);
 void CloseGame(Game* game);
 
 // Helper functions
-void SetupEntities(Game* game);
 void LoadSprite(Game* game, const char* spriteSheet, EntityType forEntity);
 int CheckCollision(const Rectangle boundingBox1, const Rectangle boundingBox2);
 
