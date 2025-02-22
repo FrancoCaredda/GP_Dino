@@ -4,7 +4,58 @@
 #include <string.h>
 #include <time.h>
 
+
 // Entity related functions
+static void InitEntities(Game* game)
+{
+    game->entities[PLAYER] = (Entity){
+        .type = PLAYER,
+        .state = FALLING,
+
+        .position = (Vector2){.x = 0, .y = 50 },
+        .scale = (Vector2){.x = 2, .y = 2 },
+        .sprite = 0,
+        .spriteCellSize = (Vector2){.x = 58, .y = 43},
+        .spriteSheet = &game->spriteSheets[PLAYER],
+
+        .bAnimate = 1,
+        .animationSpeed = 20.0f,
+        .animationFrames = 6
+    };
+
+    // Generate ground
+    const int groundStartIndex = PLAYER + 1;
+    const int groundCount = 5;
+
+    for (int i = 0; i < groundCount; i++)
+    {
+        game->entities[groundStartIndex + i] = (Entity){
+            .type = GROUND,
+            .position = (Vector2) {.x = 121 * 5 * i, .y = 186 },
+            .scale = (Vector2) {.x = 5, .y = 5 },
+            .sprite = 0,
+            .spriteCellSize = (Vector2){.x = 121, .y = 11},
+            .spriteSheet = &game->spriteSheets[GROUND],
+        };
+    }
+
+
+    // Generate obstacles
+    const int obstacleStartIndex = groundStartIndex + groundCount;
+    const int obstacleCount = MAX_ENTITY_COUNT - groundCount - 1;
+
+    for (int i = 0; i < obstacleCount; i++)
+    {
+        game->entities[obstacleStartIndex + i] = (Entity){
+            .type = OBSTACLE,
+            .position = (Vector2) {.x = -1000, .y = 108 },
+            .scale = (Vector2) {.x = 1.5f, .y = 1.5f },
+            .sprite = 0,
+            .spriteCellSize = (Vector2) {.x = 38, .y = 52 },
+            .spriteSheet = &game->spriteSheets[OBSTACLE]
+        };
+    }
+}
 static void AnimateEntity(Entity* entity, double deltaTime, int targetFPS)
 {
     static int s_FramesCount = 0;
@@ -38,6 +89,10 @@ static void UpdatePlayer(Game* game, Entity* entity, double deltaTime)
             CheckCollision(entity->collider, game->entities[i].collider))
         {
             game->state = OVER;
+            InitEntities(game->entities);
+            
+            printf("%d", entity->state);
+            break;
         }
     }
 
@@ -103,62 +158,13 @@ static void UpdateGameLogic(Game* game, double deltaTime)
 }
 
 // Game related functions
-static void InitEntities(Game* game)
-{
-    game->entities[PLAYER] = (Entity){
-        .type = PLAYER,
-        .state = FALLING,
-
-        .position = (Vector2){.x = 0, .y = 50 },
-        .scale = (Vector2){.x = 2, .y = 2 },
-        .sprite = 0,
-        .spriteCellSize = (Vector2){.x = 58, .y = 43},
-        .spriteSheet = &game->spriteSheets[PLAYER],
-
-        .bAnimate = 1,
-        .animationSpeed = 20.0f,
-        .animationFrames = 6
-    };
-
-    // Generate ground
-    const int groundStartIndex = PLAYER + 1;
-    const int groundCount = 5;
-
-    for (int i = 0; i < groundCount; i++)
-    {
-        game->entities[groundStartIndex + i] = (Entity){
-            .type = GROUND,
-            .position = (Vector2) {.x = 121 * 5 * i, .y = 186 },
-            .scale = (Vector2) {.x = 5, .y = 5 },
-            .sprite = 0,
-            .spriteCellSize = (Vector2){.x = 121, .y = 11},
-            .spriteSheet = &game->spriteSheets[GROUND],
-        };
-    }
-   
-
-    // Generate obstacles
-    const int obstacleStartIndex = groundStartIndex + groundCount;
-    const int obstacleCount = MAX_ENTITY_COUNT - groundCount - 1;
-
-    for (int i = 0; i < obstacleCount; i++)
-    {
-        game->entities[obstacleStartIndex + i] = (Entity){
-            .type = OBSTACLE,
-            .position = (Vector2) { .x = 100 * 2 * i, .y = 108 },
-            .scale = (Vector2) { .x = 1.5f, .y = 1.5f },
-            .sprite = 0,
-            .spriteCellSize = (Vector2) { .x = 38, .y = 52 },
-            .spriteSheet = &game->spriteSheets[OBSTACLE]
-        };
-    }
-}
 void InitGame(Game* game)
 {
     InitWindow(1920, 1080, "Google Dino Clone");
     SetTargetFPS(60);
 
     game->targetFPS = 60;
+    game->state = OVER;
 
     // Load Sprites
     LoadSprite(game, "/spritesheet_dino.png", PLAYER);
@@ -260,6 +266,26 @@ static void DrawGame(Game* game)
     EndDrawing();
 }
 
+static void UpdatePause(Game* game)
+{
+    if (IsKeyPressed(KEY_SPACE))
+        game->state = PLAY;
+}
+static void DrawPause()
+{
+    BeginDrawing();
+
+    Color clearColor = { 255, 255, 255, 255 };
+    ClearBackground(clearColor);
+
+    DrawText("Press SPACE to start the game", (1920.0 - 368.0) / 2.0,
+        (1080.0 - 12.0) / 2.0,
+        24,
+        BLACK);
+
+    EndDrawing();
+}
+
 void UpdateGame(Game* game)
 {
     clock_t lastFrameTime = clock();
@@ -270,10 +296,18 @@ void UpdateGame(Game* game)
         double deltaTime = (double)(currentFrameTime - lastFrameTime) / CLOCKS_PER_SEC;
         lastFrameTime = currentFrameTime;
 
-        UpdateColliders(game);
-        UpdateGameLogic(game, deltaTime);
-        SimulatePlayerPhysics(game, deltaTime);
-        DrawGame(game);
+        if (game->state == PLAY)
+        {
+            UpdateColliders(game);
+            SimulatePlayerPhysics(game, deltaTime);
+            UpdateGameLogic(game, deltaTime);
+            DrawGame(game);
+        }
+        else
+        {
+            UpdatePause(game);
+            DrawPause();
+        }
     }
 }
 
